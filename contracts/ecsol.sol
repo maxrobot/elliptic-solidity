@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity 0.5.5;
 
 contract Ecsol {
 
@@ -8,56 +8,42 @@ contract Ecsol {
     uint256 constant a = 0;
     uint256 constant b = 7;
 
-    constructor() {}
+    constructor() public {}
 
-    function _jAdd( uint256 x1,uint256 z1,
-                    uint256 x2,uint256 z2) constant
-        returns(uint256 x3,uint256 z3)
+    function _jAdd(uint256 x1, uint256 z1, uint256 x2, uint256 z2)
+        public pure returns(uint256 x3, uint256 z3)
     {
-        (x3, z3) = (  addmod( mulmod(z2, x1 , n) ,
-                              mulmod(x2, z1 , n),
-                              n),
-                      mulmod(z1, z2 , n)
-                    );
+        (x3, z3) = (addmod(mulmod(z2, x1, n), mulmod(x2, z1, n), n), mulmod(z1, z2, n));
     }
 
-    function _jSub( uint256 x1,uint256 z1,
-                    uint256 x2,uint256 z2) constant
-        returns(uint256 x3,uint256 z3)
+    function _jSub(uint256 x1, uint256 z1, uint256 x2, uint256 z2)
+        public pure returns(uint256 x3, uint256 z3)
     {
-        (x3, z3) = (  addmod( mulmod(z2, x1, n),
-                              mulmod(n - x2, z1, n),
-                              n),
-                      mulmod(z1, z2 , n)
-                    );
+        (x3, z3) = (addmod(mulmod(z2, x1, n), mulmod(n - x2, z1, n), n), mulmod(z1, z2, n));
     }
 
-    function _jMul( uint256 x1,uint256 z1,
-                    uint256 x2,uint256 z2) constant
-        returns(uint256 x3,uint256 z3)
+    function _jMul(uint256 x1, uint256 z1, uint256 x2, uint256 z2)
+        public pure returns(uint256 x3, uint256 z3)
     {
-        (x3, z3) = (  mulmod(x1, x2 , n), mulmod(z1, z2 , n));
+        (x3, z3) = (mulmod(x1, x2, n), mulmod(z1, z2, n));
     }
 
-    function _jDiv( uint256 x1,uint256 z1,
-                    uint256 x2,uint256 z2) constant
-        returns(uint256 x3,uint256 z3)
+    function _jDiv(uint256 x1, uint256 z1, uint256 x2, uint256 z2)
+        public pure returns(uint256 x3, uint256 z3)
     {
-        (x3, z3) = (  mulmod(x1, z2 , n), mulmod(z1 , x2 , n));
+        (x3, z3) = (mulmod(x1, z2, n), mulmod(z1, x2, n));
     }
 
-    function _inverse( uint256 a) constant
-        returns(uint256 invA)
-    {
-        uint256 t=0;
-        uint256 newT=1;
-        uint256 r=n;
-        uint256 newR=a;
+    function _inverse(uint256 _a) public pure returns(uint256 invA) {
+        uint256 t = 0;
+        uint256 newT = 1;
+        uint256 r = n;
+        uint256 newR = _a;
         uint256 q;
         while (newR != 0) {
             q = r / newR;
 
-            (t, newT) = (newT, addmod(t , (n - mulmod(q, newT,n)) , n));
+            (t, newT) = (newT, addmod(t, (n - mulmod(q, newT,n)), n));
             (r, newR) = (newR, r - q * newR );
         }
 
@@ -65,44 +51,43 @@ contract Ecsol {
     }
 
 
-    function _ecAdd( uint256 x1,uint256 y1,uint256 z1,
-                    uint256 x2,uint256 y2,uint256 z2) constant
-        returns(uint256 x3,uint256 y3,uint256 z3)
+    function _ecAdd(uint256 x1, uint256 y1, uint256 z1, uint256 x2, uint256 y2, uint256 z2) 
+        public pure returns(uint256 x3, uint256 y3, uint256 z3)
     {
-        uint256 l;
+        uint256 ll;
         uint256 lz;
         uint256 da;
         uint256 db;
 
-        if ((x1==0)&&(y1==0)) {
+        if ((x1==0) && (y1==0)) {
             return (x2,y2,z2);
         }
 
-        if ((x2==0)&&(y2==0)) {
+        if ((x2==0) && (y2==0)) {
             return (x1,y1,z1);
         }
 
-        if ((x1==x2)&&(y1==y2)) {
-            (l,lz) = _jMul(x1, z1, x1, z1);
-            (l,lz) = _jMul(l, lz, 3, 1);
-            (l,lz) = _jAdd(l, lz, a, 1);
+        if ((x1==x2) && (y1==y2)) {
+            (ll, lz) = _jMul(x1, z1, x1, z1);
+            (ll, lz) = _jMul(ll, lz, 3, 1);
+            (ll, lz) = _jAdd(ll, lz, a, 1);
 
-            (da,db) = _jMul(y1, z1, 2, 1);
+            (da, db) = _jMul(y1, z1, 2, 1);
         } else {
-            (l,lz) = _jSub(y2, z2, y1, z1);
-            (da,db)  = _jSub(x2, z2, x1, z1);
+            (ll, lz) = _jSub(y2, z2, y1, z1);
+            (da, db) = _jSub(x2, z2, x1, z1);
         }
 
-        (l, lz) = _jDiv(l, lz, da, db);
+        (ll, lz) = _jDiv(ll, lz, da, db);
 
 
-        (x3, da) = _jMul(l, lz, l, lz);
+        (x3, da) = _jMul(ll, lz, ll, lz);
         (x3, da) = _jSub(x3, da, x1, z1);
         (x3, da) = _jSub(x3, da, x2, z2);
 
         (y3, db) = _jSub(x1, z1, x3, da);
-        (y3, db) = _jMul(y3, db, l, lz );
-        (y3, db) = _jSub(y3, db, y1, z1 );
+        (y3, db) = _jMul(y3, db, ll, lz);
+        (y3, db) = _jSub(y3, db, y1, z1);
 
 
         if (da != db) {
@@ -115,16 +100,16 @@ contract Ecsol {
 
     }
 
-    function _ecDouble(uint256 x1,uint256 y1,uint256 z1) constant
-        returns(uint256 x3,uint256 y3,uint256 z3)
+    function _ecDouble(uint256 x1, uint256 y1, uint256 z1)
+        public pure returns(uint256 x3, uint256 y3, uint256 z3)
     {
         (x3,y3,z3) = _ecAdd(x1,y1,z1,x1,y1,z1);
     }
 
 
 
-    function _ecMul(uint256 d, uint256 x1,uint256 y1,uint256 z1) constant
-        returns(uint256 x3,uint256 y3,uint256 z3)
+    function _ecMul(uint256 d, uint256 x1, uint256 y1, uint256 z1)
+        public pure returns(uint256 x3, uint256 y3, uint256 z3)
     {
         uint256 remaining = d;
         uint256 px = x1;
@@ -149,28 +134,28 @@ contract Ecsol {
         (x3,y3,z3) = (acx,acy,acz);
     }
 
-    function publicKey(uint256 privKey) constant
-        returns(uint256 qx, uint256 qy)
+    function publicKey(uint256 privKey)
+        public pure returns(uint256 qx, uint256 qy)
     {
         uint256 x;
         uint256 y;
         uint256 z;
         (x,y,z) = _ecMul(privKey, gx, gy, 1);
         z = _inverse(z);
-        qx = mulmod(x , z ,n);
-        qy = mulmod(y , z ,n);
+        qx = mulmod(x, z, n);
+        qy = mulmod(y, z, n);
     }
 
-    function deriveKey(uint256 privKey, uint256 pubX, uint256 pubY) constant
-        returns(uint256 qx, uint256 qy)
+    function deriveKey(uint256 privKey, uint256 pubX, uint256 pubY)
+        public pure returns(uint256 qx, uint256 qy)
     {
         uint256 x;
         uint256 y;
         uint256 z;
         (x,y,z) = _ecMul(privKey, pubX, pubY, 1);
         z = _inverse(z);
-        qx = mulmod(x , z ,n);
-        qy = mulmod(y , z ,n);
+        qx = mulmod(x, z, n);
+        qy = mulmod(y, z, n);
     }
 
 }

@@ -1,14 +1,8 @@
-/*jslint node: true */
-/*global describe, it, before, beforeEach, after, afterEach */
 "use strict";
 
 const verbose = false;
 
-// const ecCurveHelper = require('../ec_helper.js');
-// const ethConnector = require('ethconnector');
 const assert = require("assert"); // node.js core module
-const async = require('async');
-const _ = require('lodash');
 const BigNumber = require('bignumber.js');
 const EC = require('elliptic').ec;
 const ec = new EC('secp256k1');
@@ -29,10 +23,12 @@ let toBigNumber = function(value) {
 }
 
 function log(S) {
-    console.log("\t" + S);
+    if (verbose) {
+        console.log("\t" + S);
+    }
 }
 
-contract.only('Ecsol.js', (accounts) => {
+contract('Ecsol.js', (accounts) => {
 
     let ecsol;
 
