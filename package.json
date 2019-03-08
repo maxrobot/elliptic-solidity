@@ -1,0 +1,34 @@
+{
+  "name": "ecdsa-test",
+  "version": "1.0.0",
+  "description": "project trying to verify NIST standard curves using a solidity smart contract",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "testrpc": "ganache-cli --port 8545 --gasLimit 0xFFFFFFFFFFF --gasPrice 0 --defaultBalanceEther 99999999999 --networkId 1234",
+    "compile": "truffle compile",
+    "deploy": "truffle deploy",
+    "test": "truffle test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "github.com/maxrobot/ecdsa-test"
+  },
+  "keywords": [
+    "solidity",
+    "elliptic",
+    "curve"
+  ],
+  "author": "FM Grabner",
+  "license": "ISC",
+  "dependencies": {
+    "async": "^2.6.2",
+    "bignumber": "^1.1.0",
+    "bignumber.js": "^8.1.1",
+    "chai": "^4.2.0",
+    "chai-as-promised": "^7.1.1",
+    "web3": "^1.0.0-beta.48"
+  }
+}
