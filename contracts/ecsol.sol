@@ -1,3 +1,5 @@
+// cleanup and upgraded version of https://github.com/jbaylina/ecsol
+// ecsol: This is an implementation of elliptic curve secp256k in 100% written in solidity.
 pragma solidity 0.5.5;
 
 contract Ecsol {
