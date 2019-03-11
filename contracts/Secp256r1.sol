@@ -1,14 +1,16 @@
-// cleanup and upgraded version of https://github.com/jbaylina/ecsol
-// ecsol: This is an implementation of elliptic curve secp256k in 100% written in solidity.
+// based upon https://github.com/jbaylina/ecsol however is implementing a different curve
+// secp256r1: This is an implementation of elliptic curve secp256r1 in 100% written in solidity.
 pragma solidity 0.5.5;
 
-contract Ecsol {
+contract Secp256r1 {
 
-    uint256 constant gx = 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798;
-    uint256 constant gy = 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8;
-    uint256 constant n = 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F;
-    uint256 constant a = 0;
-    uint256 constant b = 7;
+    uint256 constant gx = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296;
+    uint256 constant gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5;
+    uint256 constant n = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF;
+    uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
+    uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
+
+    event uint256event(uint256 output);
 
     constructor() public {}
 
@@ -34,6 +36,43 @@ contract Ecsol {
         public pure returns(uint256 x3, uint256 z3)
     {
         (x3, z3) = (mulmod(x1, z2, n), mulmod(z1, x2, n));
+    }
+
+    /*
+    * _jDouble
+    * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#doubling-dbl-2001-b
+    */
+    function _jDouble(uint256 x1, uint256 y1, uint256 z1)
+        public pure returns(uint256 x2, uint256 y2, uint256 z2)    
+        // public pure returns(uint256 x2, uint256 y2, uint256 z2)    
+    {
+        uint256 delta = mulmod(z1, z1, n);
+        uint256 gamma = mulmod(y1, y1, n);
+        uint256 alpha = x1 - delta;
+        if (alpha < 0) {
+            alpha = alpha + n;
+        }
+        uint256 alpha2 = x1 + delta;
+        alpha = alpha * alpha2;
+        alpha2 = alpha;
+
+        alpha = alpha << 1;
+        alpha = alpha + alpha2;
+
+        uint256 beta = x1 * gamma;
+
+        x2 = alpha * alpha;
+        uint256 beta8 = beta << 3;
+        y2 = beta8;
+        z2 = mulmod(beta8, 1, n);
+        // x2 = x2 - beta8;
+        // if (x2 < 0) {
+        //     x2 = x2 + n;
+        // }
+        // x2 = x2 % n;
+        // y2 = alpha;
+        // z2 = beta;
+        return (x2, y2, z2);
     }
 
     function _inverse(uint256 _a) public pure returns(uint256 invA) {
