@@ -104,10 +104,10 @@ contract.only('Secp256r1.js', (accounts) => {
                 console.log(P);
 
                 let res = await secp256r1._jDouble(P[0], P[1], P[2]);
-                // let res = await secp256r1._jDouble(P);
-                // res = await secp256r1._double(res);
                 console.log(res)
 
+                // res = await secp256r1.dbl(P[0], P[1], P[2]);    
+                // console.log(res)
                 
              }
         })

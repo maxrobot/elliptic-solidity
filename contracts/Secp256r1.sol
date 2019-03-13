@@ -66,16 +66,21 @@ contract Secp256r1 {
             let zz := mulmod(p3, p3, pd) // ZZ = Z1^2
 
             // let tt := mulmod(p1, yy, pd) // tt = X1*YY
-            // let S := mulmod(4, tt, pd) // S = 4*t0
-            let M := sub(mulmod(3, xx, pd), mulmod(3, mulmod(zz, zz, pd), pd)) // M = t3+t2 = (3*xx)+(a*t1) = (3*xx)+(a*(zz^2)))
+            // let S := mulmod(0x04, tt, pd) // S = 4*t0
+            let S := mulmod(0x04, mulmod(p1, yy, pd), pd) // S = 4*t0
+            let M := sub(mulmod(0x03, xx, pd), mulmod(0x03, mulmod(zz, zz, pd), pd)) // M = t3+t2 = (3*xx)+(a*t1) = (3*xx)+(a*(zz^2)))
 
-            let T := sub(mulmod(M, M, pd), mulmod(2, mulmod(4, mulmod(p1, yy, pd), pd), pd)) // T = t4-t5 = (M^2)-(2*S)
+            let T := sub(mulmod(M, M, pd), mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd)) // T = t4-t5 = (M^2)-(2*S)
+            q1 := T
+            // mstore(0x0260, sub(mulmod(M, M, pd), mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd)))
+            // q1 := mload(0x0260)
 
-            // q1 := T
+            // q2 := sub(mulmod(M, sub(mulmod(0x04, mulmod(p1, yy, pd), pd), T), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
+            // q2 := sub(mulmod(M, sub(mulmod(0x04, mulmod(p1, yy, pd), pd), mload(0x0260)), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
 
-            q2 := sub(mulmod(M, sub(mulmod(4, mulmod(p1, yy, pd), pd), T), pd), mulmod(8, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
+            q2 := sub(mulmod(M, sub(S, T), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
 
-            // q3 := mulmod(addmod(p2, p2, pd), p3, pd) //z3 = 2*y1*z1
+            q3 := mulmod(addmod(p2, p2, pd), p3, pd) //z3 = 2*y1*z1
         }
 
     }
