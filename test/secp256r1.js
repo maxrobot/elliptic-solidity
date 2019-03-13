@@ -10,9 +10,11 @@ const ec = new EC('p256');
 const Secp256r1 = artifacts.require("Secp256r1");
 const Ecsol = artifacts.require("Ecsol");
 
-const n = new BigNumber('FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF', 16);
+const pp = new BigNumber('FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF', 16);
 const gx = new BigNumber('6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296', 16);
 const gy = new BigNumber('4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5', 16);
+const n = new BigNumber('FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551', 16);
+
 const n2 = new BigNumber('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141', 16);
 
 let toBigNumber = function(value) {
@@ -77,8 +79,15 @@ contract.only('Secp256r1.js', (accounts) => {
         it.only('Jacobian Double', async () => {
             const ECADD_TEST_DATA = {
                 "TEST_1": {
-                    "input": ["d9e56176cf9b64d2d463285d4236ee6155a00877be3e42fbffd56dbf00b2667c", "497b83929bd210705aff0b98f29e5609920e5ff581240c6408caa43e4f1c2e43", "1"],
-                    "output": ["1d41dda01e18bad549022e66b69aac8d079bfa37ceee7300f3dfb86dee67d954", "9ac8d17ea0af336df29b4650659b11a7c0e8a0b8e35d4a1784e3b3b687c80855", "92f7072537a420e0b5fe1731e53cac13241cbfeb024818c81195487c9e385c86"]
+                    "input": [
+                        "d9e56176cf9b64d2d463285d4236ee6155a00877be3e42fbffd56dbf00b2667c", "497b83929bd210705aff0b98f29e5609920e5ff581240c6408caa43e4f1c2e43",
+                        "1"
+                    ],
+                    "output": [
+                        "1d41dda01e18bad549022e66b69aac8d079bfa37ceee7300f3dfb86dee67d954", 
+                        "9ac8d17ea0af336df29b4650659b11a7c0e8a0b8e35d4a1784e3b3b687c80855",
+                        "92f7072537a420e0b5fe1731e53cac13241cbfeb024818c81195487c9e385c86"
+                    ]
                 }
             };
 
@@ -90,15 +99,17 @@ contract.only('Secp256r1.js', (accounts) => {
                 const y1 = toBigNumber(new BigNumber(fixture['input'][1], 16));
                 const z1 = toBigNumber(new BigNumber(fixture['input'][2], 16));
 
-                console.log(x1)
-                console.log(y1)
-                console.log(z1)
 
-                const res = await secp256r1._jDouble(x1, y1, z1);
-                console.log(res[0].toString(16))
-                console.log(res[1].toString(16))
-                console.log(res[2].toString(16))
-            }
+                let P =[x1, y1, z1];
+                console.log(P);
+
+                let res = await secp256r1._jDouble(P[0], P[1], P[2]);
+                // let res = await secp256r1._jDouble(P);
+                // res = await secp256r1._double(res);
+                console.log(res)
+
+                
+             }
         })
 
         it('Should Subtract two big numbers', async () => {
