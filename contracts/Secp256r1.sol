@@ -49,90 +49,37 @@ contract Secp256r1 {
     function _jDouble(uint p1, uint p2, uint p3)
         public pure returns(uint q1, uint q2, uint q3)    
     {
-        // int val = -3;
         assembly {
             mstore(0x0200, p1)
             mstore(0x0220, p2)
             mstore(0x0240, p3)
-            // mstore(0x0260, p3)
-            // mstore(0x0280, p3)
-            // mstore(0x02A0, p3)
-
-            // mstore(0x0260, val)
 
             let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
             let xx := mulmod(p1, p1, pd) // XX = X1^2
             let yy := mulmod(p2, p2, pd) // YY = Y1^2
             let zz := mulmod(p3, p3, pd) // ZZ = Z1^2
 
-            // let tt := mulmod(p1, yy, pd) // tt = X1*YY
-            // let S := mulmod(0x04, tt, pd) // S = 4*t0
             let S := mulmod(0x04, mulmod(p1, yy, pd), pd) // S = 4*t0
             let M := sub(mulmod(0x03, xx, pd), mulmod(0x03, mulmod(zz, zz, pd), pd)) // M = t3+t2 = (3*xx)+(a*t1) = (3*xx)+(a*(zz^2)))
 
-            let T := sub(mulmod(M, M, pd), mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd)) // T = t4-t5 = (M^2)-(2*S)
+            mstore(0x0260, mulmod(M, M, pd))
+            mstore(0x0280, mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd))
+            // let T := sub(mulmod(M, M, pd), mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd)) // T = t4-t5 = (M^2)-(2*S)
+            let T := sub(mload(0x0260), mload(0x0280)) // T = t4-t5 = (M^2)-(2*S)
             q1 := T
-            // mstore(0x0260, sub(mulmod(M, M, pd), mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd)))
-            // q1 := mload(0x0260)
-
-            // q2 := sub(mulmod(M, sub(mulmod(0x04, mulmod(p1, yy, pd), pd), T), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
-            // q2 := sub(mulmod(M, sub(mulmod(0x04, mulmod(p1, yy, pd), pd), mload(0x0260)), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
+            if lt(mload(0x0260), mload(0x0280)) {
+                q1 := sub(add(pd, mload(0x0260)), mload(0x0280))
+            }
 
             q2 := sub(mulmod(M, sub(S, T), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
+            if lt(mulmod(M, sub(S, T), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) {
+                q2 := add(pd, mulmod(M, sub(S, T), pd))
+                q2 := sub(q2, mulmod(0x08, mulmod(yy, yy, pd), pd))
+            }
 
             q3 := mulmod(addmod(p2, p2, pd), p3, pd) //z3 = 2*y1*z1
         }
 
-    }
-
-      // Implementation of http://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-0/doubling/dbl-2009-l.op3
-    function dbl(uint p1, uint p2, uint p3)
-        public pure returns(uint q1, uint q2, uint q3)
-    {
-        assembly {
-            mstore(0x0200, p1)
-            mstore(0x0220, p2)
-            mstore(0x0240, p3)
-            mstore(0x0260, q1)
-            mstore(0x0280, q2)
-            mstore(0x02A0, q3)
-            let Pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-            let axd := mload(0x0200)
-            let ayd := mload(0x0220)
-            //A = X1^2
-            let tmp1d := mulmod(axd, axd, Pd)
-            //B = Y1^2
-            let tmp2d := mulmod(ayd, ayd, Pd)
-            //C = B^2
-            let tmp3d := mulmod(tmp2d, tmp2d, Pd)
-            //t0 = X1+B
-            let tmp4d := addmod(axd, tmp2d, Pd) // Since (2^256 - 1)/P ~ 5, we can afford to skip a few mod ops whenadding
-
-            //D = 2*t3 = 2*(t2-C) = 2*(t1-A-C) = 2*((X1+B)^2-(A+C))
-            tmp2d := mulmod(0x02, addmod(mulmod(tmp4d, tmp4d, Pd), sub(add(Pd, Pd), add(tmp1d, tmp3d)), Pd), Pd)
-
-            //E = 3*A
-            tmp1d := mul(0x03, tmp1d)
-
-            //F = E^2
-            tmp4d := mulmod(tmp1d, tmp1d, Pd)
-
-            //X3 = F-2*D, X3 -> p + 0x00
-            mstore(0x0260, addmod(tmp4d, sub(add(Pd, Pd), add(tmp2d, tmp2d)), Pd))
-
-            //Y3 = t7-t6 = E*(D-X3) - 8*C, r -> p + 0x20
-            mstore(0x0280, sub(mulmod(tmp1d, sub(tmp2d, mload(0x0260)), Pd), mulmod(0x08, tmp3d, Pd)))
-            // mstore(0x0280, addmod(mulmod(tmp1d, add(tmp2d, sub(Pd, mload(0x0260))), Pd), sub(Pd, mulmod(0x08, tmp3d, Pd)), Pd))
-            q1 := mulmod(0x08, tmp3d, Pd) // t6
-            q2 := mulmod(tmp1d, sub(tmp2d, mload(0x0260)), Pd) // t7
-
-            //Z3 = 2*t8 = 2*Y1*Z1, Z3 -> p + 0x40
-            mstore(0x02A0, mulmod( 0x02, mulmod(ayd, mload(0x0240), Pd), Pd))
-
-            q1 := mload(0x0260)
-            q2 := mload(0x0280)
-            q3 := mload(0x02A0)
-        }
     }
 
     function _toJacobian(uint[3] memory P) public pure returns (uint[3] memory) {
