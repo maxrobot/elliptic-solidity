@@ -18,42 +18,83 @@ contract Secp256r1 {
 
     constructor() public {}
 
-    function _jAdd(uint256 x1, uint256 z1, uint256 x2, uint256 z2)
-        public pure returns(uint256 x3, uint256 z3)
+   /*
+    * _jAdd
+    * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
+    */
+    function _jAdd(uint p1, uint p2, uint p3, uint q1, uint q2, uint q3)
+        public pure returns(uint r1, uint r2, uint r3)    
     {
-        (x3, z3) = (addmod(mulmod(z2, x1, n), mulmod(x2, z1, n), n), mulmod(z1, z2, n));
-    }
+        assembly {
+            let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+            let z1z1 := mulmod(p3, p3, pd) // Z1Z1 = Z1^2
+            let z2z2 := mulmod(q3, q3, pd) // Z2Z2 = Z2^2
 
-    function _jSub(uint256 x1, uint256 z1, uint256 x2, uint256 z2)
-        public pure returns(uint256 x3, uint256 z3)
-    {
-        (x3, z3) = (addmod(mulmod(z2, x1, n), mulmod(n - x2, z1, n), n), mulmod(z1, z2, n));
-    }
+            let u1 := mulmod(p1, z2z2, pd) // U1 = X1*Z2Z2
+            let u2 := mulmod(q1, z1z1, pd) // U2 = X2*Z1Z1
 
-    function _jMul(uint256 x1, uint256 z1, uint256 x2, uint256 z2)
-        public pure returns(uint256 x3, uint256 z3)
-    {
-        (x3, z3) = (mulmod(x1, x2, n), mulmod(z1, z2, n));
-    }
+            let s1 := mulmod(p2, mulmod(z2z2, q3, pd), pd) // S1 = Y1*Z2*Z2Z2
+            let s2 := mulmod(q2, mulmod(z1z1, p3, pd), pd) // S2 = Y2*Z1*Z1Z1
 
-    function _jDiv(uint256 x1, uint256 z1, uint256 x2, uint256 z2)
-        public pure returns(uint256 x3, uint256 z3)
-    {
-        (x3, z3) = (mulmod(x1, z2, n), mulmod(z1, x2, n));
+            mstore(0x02A0, addmod(p3, q3, pd))
+
+            if lt(u2, u1) {
+                u2 := add(pd, u2) // u2 = u2+pd
+            }
+            let h := sub(u2, u1) // H = U2-U1
+
+            let i := mulmod(mulmod(0x02, h, pd), mulmod(0x02, h, pd), pd) // I = (2*H)^2
+
+            let j := mulmod(h, i, pd) // J = H*I
+            if lt(s2, s1) {
+                s2 := add(pd, s2) // u2 = u2+pd
+            }
+            let rr := mulmod(0x02, sub(s2, s1), pd) // r = 2*(S2-S1)
+
+            let v := mulmod(u1, i, pd) // V = U1*I
+            r1 := mulmod(rr, rr, pd) // X3 = R^2
+
+            mstore(0x0260, addmod(j, mulmod(0x02, v, pd), pd)) // I = J+(2*V)
+            if lt(r1, mload(0x0260)) {
+                r1 := add(pd, r1) // X3 = X3+pd
+            }
+            r1 := sub(r1, mload(0x0260))
+
+            // Y3 = r*(V-X3)-2*S1*J
+            mstore(0x0220, mulmod(0x02, s1, pd))
+            mstore(0x0220, mulmod(mload(0x0220), j, pd))
+
+            if lt(v, r1) {
+                v := add(pd, v)
+            }
+            mstore(0x0240, sub(v, r1))
+            mstore(0x0240, mulmod(rr, mload(0x240), pd))
+
+            if lt(mload(0x0240), mload(0x0220)) {
+                mstore(0x0240, add(mload(0x0240), pd))
+            }
+            mstore(0x0240, sub(mload(0x0240), mload(0x0220)))
+            r2 := mload(0x0240)
+
+            // Z3 = ((Z1+Z2)^2-Z1Z1-Z2Z2)*H
+            z1z1 := addmod(z1z1, z2z2, pd)
+            mstore(0x0260, mulmod(mload(0x02A0), mload(0x02A0), pd))
+            // r3 := mload(0x0260)
+            if lt(mload(0x0260), z1z1) {
+                mstore(0x0260, add(pd, mload(0x0260)))
+            }
+            r3 := mulmod(sub(mload(0x0260), z1z1), h, pd)
+        }
     }
 
     /*
     * _jDouble
     * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
     */
-    function _mdbl_2007_bl(uint p1, uint p2, uint p3)
+    function _jDouble(uint p1, uint p2, uint p3)
         public pure returns(uint q1, uint q2, uint q3)    
     {
         assembly {
-            mstore(0x0200, p1)
-            mstore(0x0220, p2)
-            mstore(0x0240, p3)
-
             let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
             let xx := mulmod(p1, p1, pd) // XX = X1^2
             let yy := mulmod(p2, p2, pd) // YY = Y1^2
@@ -95,231 +136,6 @@ contract Secp256r1 {
 
         }
 
-    }
-
-    /*
-    * _jDouble
-    * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/dbl-1998-cmo-2.op3
-    */
-    function _jDouble(uint p1, uint p2, uint p3)
-        public pure returns(uint q1, uint q2, uint q3)    
-    {
-        assembly {
-            mstore(0x0200, p1)
-            mstore(0x0220, p2)
-            mstore(0x0240, p3)
-
-            let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-            let xx := mulmod(p1, p1, pd) // XX = X1^2
-            let yy := mulmod(p2, p2, pd) // YY = Y1^2
-            let zz := mulmod(p3, p3, pd) // ZZ = Z1^2
-
-            let S := mulmod(0x04, mulmod(p1, yy, pd), pd) // S = 4*t0
-            let M := sub(mulmod(0x03, xx, pd), mulmod(0x03, mulmod(zz, zz, pd), pd)) // M = t3+t2 = (3*xx)+(a*t1) = (3*xx)+(a*(zz^2)))
-            
-            mstore(0x0260, mulmod(M, M, pd))
-            mstore(0x0280, mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd))
-            // let T := sub(mulmod(M, M, pd), mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd)) // T = t4-t5 = (M^2)-(2*S)
-            let T := sub(mload(0x0260), mload(0x0280)) // T = t4-t5 = (M^2)-(2*S)
-            q1 := T
-
-            if lt(mload(0x0260), mload(0x0280)) {
-                q1 := sub(add(pd, mload(0x0260)), mload(0x0280))
-                q1 := mod(q1, pd)
-            }
-
-            q2 := sub(mulmod(M, sub(S, q1), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
-            q3 := S
-            // q3 := mulmod(M, sub(S, T), pd)
-            if lt(mulmod(M, sub(S, q1), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) {
-                q2 := add(pd, mulmod(M, sub(S, q1), pd))
-                q2 := sub(q2, mulmod(0x08, mulmod(yy, yy, pd), pd))
-            }
-
-            // q3 := mulmod(addmod(p2, p2, pd), p3, pd) //z3 = 2*y1*z1
-        }
-
-    }
-
-    function _toJacobian(uint[3] memory P) public pure returns (uint[3] memory) {
-        ECCMath.toZ1(P, pp);
-        return P;        
-    } 
-
-    function _double(uint[3] memory P) public pure returns (uint[3] memory Q) {
-        uint p = pp;
-        assert(P[2] != 0);
-        uint Px = P[0];
-        uint Py = P[1];
-        uint gamma = mulmod(Py, Py, p);
-        uint s = mulmod(4, mulmod(Px, gamma, p), p);
-        uint m = mulmod(3, mulmod(Px, Px, p), p);
-        uint Qx = addmod(mulmod(m, m, p), p - addmod(s, s, p), p);
-        Q[0] = Qx;
-        Q[1] = addmod(mulmod(m, addmod(s, p - Qx, p), p), p - mulmod(8, mulmod(gamma, gamma, p), p), p);
-        Q[2] = mulmod(2, mulmod(Py, P[2], p), p);
-    }
-
-    // Point addition, P + Q
-    // inData: Px, Py, Pz, Qx, Qy, Qz
-    // outData: Rx, Ry, Rz
-    function _add(uint[3] memory P, uint[3] memory Q) public pure returns (uint[3] memory R) {
-        assert(P[2] != 0);
-        assert(Q[2] != 0);
-
-        uint p = pp;
-        uint[4] memory zs; // Pz^2, Pz^3, Qz^2, Qz^3
-        zs[0] = mulmod(P[2], P[2], p);
-        zs[1] = mulmod(P[2], zs[0], p);
-        zs[2] = mulmod(Q[2], Q[2], p);
-        zs[3] = mulmod(Q[2], zs[2], p);
-        uint[4] memory us = [
-            mulmod(P[0], zs[2], p),
-            mulmod(P[1], zs[3], p),
-            mulmod(Q[0], zs[0], p),
-            mulmod(Q[1], zs[1], p)
-        ]; // Pu, Ps, Qu, Qs
-        if (us[0] == us[2]) {
-            if (us[1] != us[3])
-                return Q;
-            else {
-                return _double(P);
-            }
-        }
-        uint h = addmod(us[2], p - us[0], p);
-        uint r = addmod(us[3], p - us[1], p);
-        uint h2 = mulmod(h, h, p);
-        uint h3 = mulmod(h2, h, p);
-        uint Rx = addmod(mulmod(r, r, p), p - h3, p);
-        Rx = addmod(Rx, p - mulmod(2, mulmod(us[0], h2, p), p), p);
-        R[0] = Rx;
-        R[1] = mulmod(r, addmod(mulmod(us[0], h2, p), p - Rx, p), p);
-        R[1] = addmod(R[1], p - mulmod(us[1], h3, p), p);
-        R[2] = mulmod(h, mulmod(P[2], Q[2], p), p);
-    }
-
-    function _inverse(uint256 _a) public pure returns(uint256 invA) {
-        uint256 t = 0;
-        uint256 newT = 1;
-        uint256 r = n;
-        uint256 newR = _a;
-        uint256 q;
-        while (newR != 0) {
-            q = r / newR;
-
-            (t, newT) = (newT, addmod(t, (n - mulmod(q, newT,n)), n));
-            (r, newR) = (newR, r - q * newR );
-        }
-
-        return t;
-    }
-
-
-    function _ecAdd(uint256 x1, uint256 y1, uint256 z1, uint256 x2, uint256 y2, uint256 z2) 
-        public pure returns(uint256 x3, uint256 y3, uint256 z3)
-    {
-        uint256 ll;
-        uint256 lz;
-        uint256 da;
-        uint256 db;
-
-        if ((x1==0) && (y1==0)) {
-            return (x2,y2,z2);
-        }
-
-        if ((x2==0) && (y2==0)) {
-            return (x1,y1,z1);
-        }
-
-        if ((x1==x2) && (y1==y2)) {
-            (ll, lz) = _jMul(x1, z1, x1, z1);
-            (ll, lz) = _jMul(ll, lz, 3, 1);
-            (ll, lz) = _jAdd(ll, lz, a, 1);
-
-            (da, db) = _jMul(y1, z1, 2, 1);
-        } else {
-            (ll, lz) = _jSub(y2, z2, y1, z1);
-            (da, db) = _jSub(x2, z2, x1, z1);
-        }
-
-        (ll, lz) = _jDiv(ll, lz, da, db);
-
-
-        (x3, da) = _jMul(ll, lz, ll, lz);
-        (x3, da) = _jSub(x3, da, x1, z1);
-        (x3, da) = _jSub(x3, da, x2, z2);
-
-        (y3, db) = _jSub(x1, z1, x3, da);
-        (y3, db) = _jMul(y3, db, ll, lz);
-        (y3, db) = _jSub(y3, db, y1, z1);
-
-
-        if (da != db) {
-            x3 = mulmod(x3, db, n);
-            y3 = mulmod(y3, da, n);
-            z3 = mulmod(da, db, n);
-        } else {
-            z3 = da;
-        }
-
-    }
-
-    function _ecDouble(uint256 x1, uint256 y1, uint256 z1)
-        public pure returns(uint256 x3, uint256 y3, uint256 z3)
-    {
-        (x3,y3,z3) = _ecAdd(x1,y1,z1,x1,y1,z1);
-    }
-
-
-
-    function _ecMul(uint256 d, uint256 x1, uint256 y1, uint256 z1)
-        public pure returns(uint256 x3, uint256 y3, uint256 z3)
-    {
-        uint256 remaining = d;
-        uint256 px = x1;
-        uint256 py = y1;
-        uint256 pz = z1;
-        uint256 acx = 0;
-        uint256 acy = 0;
-        uint256 acz = 1;
-
-        if (d==0) {
-            return (0,0,1);
-        }
-
-        while (remaining != 0) {
-            if ((remaining & 1) != 0) {
-                (acx,acy,acz) = _ecAdd(acx,acy,acz, px,py,pz);
-            }
-            remaining = remaining / 2;
-            (px,py,pz) = _ecDouble(px,py,pz);
-        }
-
-        (x3,y3,z3) = (acx,acy,acz);
-    }
-
-    function publicKey(uint256 privKey)
-        public pure returns(uint256 qx, uint256 qy)
-    {
-        uint256 x;
-        uint256 y;
-        uint256 z;
-        (x,y,z) = _ecMul(privKey, gx, gy, 1);
-        z = _inverse(z);
-        qx = mulmod(x, z, n);
-        qy = mulmod(y, z, n);
-    }
-
-    function deriveKey(uint256 privKey, uint256 pubX, uint256 pubY)
-        public pure returns(uint256 qx, uint256 qy)
-    {
-        uint256 x;
-        uint256 y;
-        uint256 z;
-        (x,y,z) = _ecMul(privKey, pubX, pubY, 1);
-        z = _inverse(z);
-        qx = mulmod(x, z, n);
-        qy = mulmod(y, z, n);
     }
 
 }
