@@ -44,6 +44,61 @@ contract Secp256r1 {
 
     /*
     * _jDouble
+    * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
+    */
+    function _mdbl_2007_bl(uint p1, uint p2, uint p3)
+        public pure returns(uint q1, uint q2, uint q3)    
+    {
+        assembly {
+            mstore(0x0200, p1)
+            mstore(0x0220, p2)
+            mstore(0x0240, p3)
+
+            let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
+            let xx := mulmod(p1, p1, pd) // XX = X1^2
+            let yy := mulmod(p2, p2, pd) // YY = Y1^2
+            let yyyy := mulmod(yy, yy, pd) // YYYY = YY^2
+
+            let t := mulmod(addmod(p1, yy, pd), addmod(p1, yy, pd), pd) // t1 = t0^2 = (X1+YY)^2
+            if lt(mulmod(addmod(p1, yy, pd), addmod(p1, yy, pd), pd), xx) {
+                t := add(mulmod(addmod(p1, yy, pd), addmod(p1, yy, pd), pd), pd) // t1 = ((X1+YY)^2)+pd
+            }
+            t := sub(t, xx) // t2 = t1-XX
+            
+            if lt(t, yyyy) {
+                t := add(t, pd) // t2 = t2+pd
+            }
+            t := sub(t, yyyy) // t3 = t2-YYYY
+
+            let s := mulmod(0x02, t, pd) // S = 2*t3
+            t := mulmod(0x03, xx, pd) // t4 = 3*XX
+            let m := sub(t, 3) // M = t4 + a = t4 + (-3) = t4 - 3
+
+            let tt := sub(mulmod(m, m, pd), mulmod(0x02, s, pd)) // T = t5 - t6 = (M^2) - (2*S)
+            if lt(mulmod(m, m, pd), mulmod(0x02, s, pd)) {
+                tt := sub(add(pd, mulmod(m, m, pd)), mulmod(0x02, s, pd))
+            }
+            q1 := tt // X3 = T
+
+            if lt(s, tt) {
+                s := add(pd, s)
+            }
+
+            let t9 := mulmod(m, sub(s, tt), pd)
+            if lt(t9, mulmod(0x08, yyyy, pd)) {
+                t9 := add(pd, t9)
+            }
+
+            q2 := sub(t9, mulmod(0x08, yyyy, pd)) // Y3 = t9 - t8 = (M*t7)-(8*YYYY) = (M*(S-T))-(8*YYYY)
+            
+            q3 := mulmod(0x02, p2, pd) // Z3 = 2*Y1
+
+        }
+
+    }
+
+    /*
+    * _jDouble
     * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/dbl-1998-cmo-2.op3
     */
     function _jDouble(uint p1, uint p2, uint p3)
@@ -61,23 +116,27 @@ contract Secp256r1 {
 
             let S := mulmod(0x04, mulmod(p1, yy, pd), pd) // S = 4*t0
             let M := sub(mulmod(0x03, xx, pd), mulmod(0x03, mulmod(zz, zz, pd), pd)) // M = t3+t2 = (3*xx)+(a*t1) = (3*xx)+(a*(zz^2)))
-
+            
             mstore(0x0260, mulmod(M, M, pd))
             mstore(0x0280, mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd))
             // let T := sub(mulmod(M, M, pd), mulmod(0x02, mulmod(0x04, mulmod(p1, yy, pd), pd), pd)) // T = t4-t5 = (M^2)-(2*S)
             let T := sub(mload(0x0260), mload(0x0280)) // T = t4-t5 = (M^2)-(2*S)
             q1 := T
+
             if lt(mload(0x0260), mload(0x0280)) {
                 q1 := sub(add(pd, mload(0x0260)), mload(0x0280))
+                q1 := mod(q1, pd)
             }
 
-            q2 := sub(mulmod(M, sub(S, T), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
-            if lt(mulmod(M, sub(S, T), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) {
-                q2 := add(pd, mulmod(M, sub(S, T), pd))
+            q2 := sub(mulmod(M, sub(S, q1), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) // y3 = t9-t8 = (M*t6)-(8*t7) = (M*(S-T))-(8*(YY^2))
+            q3 := S
+            // q3 := mulmod(M, sub(S, T), pd)
+            if lt(mulmod(M, sub(S, q1), pd), mulmod(0x08, mulmod(yy, yy, pd), pd)) {
+                q2 := add(pd, mulmod(M, sub(S, q1), pd))
                 q2 := sub(q2, mulmod(0x08, mulmod(yy, yy, pd), pd))
             }
 
-            q3 := mulmod(addmod(p2, p2, pd), p3, pd) //z3 = 2*y1*z1
+            // q3 := mulmod(addmod(p2, p2, pd), p3, pd) //z3 = 2*y1*z1
         }
 
     }

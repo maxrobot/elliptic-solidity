@@ -54,21 +54,47 @@ type point struct {
 func main() {
 	c := elliptic.P256()
 
-	x1, _ := hexutil.DecodeBig("0x450b0f4ce383ec2a909ae556e87ceab6facb8c3a84a9c4cf9848ca328df6a08f")
-	y1, _ := hexutil.DecodeBig("0x6af82e410c801b903d9f033b127121f7dd1857d7c5e4520ae32daaffdb236741")
+	// x1, _ := hexutil.DecodeBig("0x9cb73fe3e7264f5438d4f209fc140edbc26660560e9579b6cc28c9deb6a4cb36")
+	// y1, _ := hexutil.DecodeBig("0xa7bc8fec623f7dcededc89f8138f4a03924adbfa7b69e7000ce99c65e14e2526")
+
+	// x1, _ := hexutil.DecodeBig("0xcef6d0ff4ac3b92c5a948c2c686c1f776b7a5e28a220e42adffa013e22d863b9")
+	// y1, _ := hexutil.DecodeBig("0xebc80e5d0206cf4f18c5e6a787fd7588bd4573d57fcaad85b190cd8d8d72521f")
+
+	x1, _ := hexutil.DecodeBig("0xd9e56176cf9b64d2d463285d4236ee6155a00877be3e42fbffd56dbf00b2667c")
+	y1, _ := hexutil.DecodeBig("0x497b83929bd210705aff0b98f29e5609920e5ff581240c6408caa43e4f1c2e43")
 
 	fmt.Printf("On Curve P1: %v\n", c.IsOnCurve(x1, y1))
 
 	z1 := zForAffine(x1, y1)
 	fmt.Printf("x1: %x\ny1: %x\nz1: %x\n", x1, y1, z1)
 
-	x3, y3, z3 := doubleJacobian(c.Params(), x1, y1, z1)
-	fmt.Println("Double Jacobian Result:")
+	// x3, y3, z3 := doubleJacobian(c.Params(), x1, y1, z1)
+	// fmt.Println("Double Jacobian Result:")
+	// fmt.Printf("x3: %x\n", x3)
+	// fmt.Printf("y3: %x\n", y3)
+	// fmt.Printf("z3: %x\n", z3)
+
+	x3, y3, z3 := mdoubleJacobian2007(c.Params(), x1, y1, z1)
+	fmt.Println("Double Jacobian1998 Result:")
 	fmt.Printf("x3: %x\n", x3)
 	fmt.Printf("y3: %x\n", y3)
 	fmt.Printf("z3: %x\n", z3)
 
-	x3, y3, z3 = doubleJacobian1998(c.Params(), x1, y1, z1)
+	x1, _ = hexutil.DecodeBig("0x9cb73fe3e7264f5438d4f209fc140edbc26660560e9579b6cc28c9deb6a4cb36")
+	y1, _ = hexutil.DecodeBig("0xa7bc8fec623f7dcededc89f8138f4a03924adbfa7b69e7000ce99c65e14e2526")
+
+	fmt.Printf("On Curve P1: %v\n", c.IsOnCurve(x1, y1))
+
+	z1 = zForAffine(x1, y1)
+	fmt.Printf("x1: %x\ny1: %x\nz1: %x\n", x1, y1, z1)
+
+	// x3, y3, z3 := doubleJacobian(c.Params(), x1, y1, z1)
+	// fmt.Println("Double Jacobian Result:")
+	// fmt.Printf("x3: %x\n", x3)
+	// fmt.Printf("y3: %x\n", y3)
+	// fmt.Printf("z3: %x\n", z3)
+
+	x3, y3, z3 = mdoubleJacobian2007(c.Params(), x1, y1, z1)
 	fmt.Println("Double Jacobian1998 Result:")
 	fmt.Printf("x3: %x\n", x3)
 	fmt.Printf("y3: %x\n", y3)
@@ -203,80 +229,94 @@ func MyVerify(pub *ecdsa.PublicKey, hash []byte, r, s *big.Int) bool {
 	return x.Cmp(r) == 0
 }
 
-func addJacobian(curve *elliptic.CurveParams, x1, y1, z1, x2, y2, z2 *big.Int) (*big.Int, *big.Int, *big.Int) {
-	// See https://hyperelliptic.org/EFD/g1p/auto-shortw-jacobian-3.html#addition-add-2007-bl
-	x3, y3, z3 := new(big.Int), new(big.Int), new(big.Int)
-	if z1.Sign() == 0 {
-		x3.Set(x2)
-		y3.Set(y2)
-		z3.Set(z2)
-		return x3, y3, z3
+func mdoubleJacobian2007(curve *elliptic.CurveParams, x, y, z *big.Int) (*big.Int, *big.Int, *big.Int) {
+	// See https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
+	x1 := x
+	y1 := y
+	z1 := z
+
+	xx := new(big.Int).Mul(x1, x1)
+	xx.Mod(xx, curve.P)
+
+	yy := new(big.Int).Mul(y1, y1)
+	yy.Mod(yy, curve.P)
+
+	yyyy := new(big.Int).Mul(yy, yy)
+	yyyy.Mod(yyyy, curve.P)
+
+	t0 := new(big.Int).Add(x1, yy)
+	t0.Mod(t0, curve.P)
+
+	t1 := new(big.Int).Mul(t0, t0)
+	t1.Mod(t1, curve.P)
+
+	if t1.Cmp(xx) == -1 {
+		t1.Add(t1, curve.P)
 	}
-	if z2.Sign() == 0 {
-		x3.Set(x1)
-		y3.Set(y1)
-		z3.Set(z1)
-		return x3, y3, z3
+	t2 := new(big.Int).Sub(t1, xx)
+	// fmt.Printf("t2: %x\n", t2)
+
+	if t2.Cmp(yyyy) == -1 {
+		t2.Add(t2, curve.P)
 	}
+	t3 := new(big.Int).Sub(t2, yyyy)
+	// fmt.Printf("t3: %x\n", t3)
 
-	z1z1 := new(big.Int).Mul(z1, z1)
-	z1z1.Mod(z1z1, curve.P)
-	z2z2 := new(big.Int).Mul(z2, z2)
-	z2z2.Mod(z2z2, curve.P)
+	s := new(big.Int).Mul(big.NewInt(2), t3)
+	s.Mod(s, curve.P)
+	// fmt.Printf("s: %x\n", s)
 
-	u1 := new(big.Int).Mul(x1, z2z2)
-	u1.Mod(u1, curve.P)
-	u2 := new(big.Int).Mul(x2, z1z1)
-	u2.Mod(u2, curve.P)
-	h := new(big.Int).Sub(u2, u1)
-	xEqual := h.Sign() == 0
-	if h.Sign() == -1 {
-		h.Add(h, curve.P)
+	t4 := new(big.Int).Mul(big.NewInt(3), xx)
+	t4.Mod(t4, curve.P)
+	// fmt.Printf("t4: %x\n", t4)
+
+	m := new(big.Int).Sub(t4, big.NewInt(3))
+	m.Mod(m, curve.P)
+	// fmt.Printf("m: %x\n", m)
+
+	t5 := new(big.Int).Mul(m, m)
+	t5.Mod(t5, curve.P)
+	// fmt.Printf("t5: %x\n", t5)
+
+	t6 := new(big.Int).Mul(big.NewInt(2), s)
+	t6.Mod(t6, curve.P)
+	// fmt.Printf("t6: %x\n", t6)
+
+	if t5.Cmp(t6) == -1 {
+		t5.Add(t5, curve.P)
 	}
-	i := new(big.Int).Lsh(h, 1)
-	i.Mul(i, i)
-	j := new(big.Int).Mul(h, i)
+	tt := new(big.Int).Sub(t5, t6)
+	x3 := tt
+	// fmt.Printf("tt: %x\n", tt)
 
-	s1 := new(big.Int).Mul(y1, z2)
-	s1.Mul(s1, z2z2)
-	s1.Mod(s1, curve.P)
-	s2 := new(big.Int).Mul(y2, z1)
-	s2.Mul(s2, z1z1)
-	s2.Mod(s2, curve.P)
-	r := new(big.Int).Sub(s2, s1)
-	if r.Sign() == -1 {
-		r.Add(r, curve.P)
+	if s.Cmp(tt) == -1 {
+		s.Add(s, curve.P)
 	}
-	yEqual := r.Sign() == 0
-	if xEqual && yEqual {
-		return doubleJacobian(curve, x1, y1, z1)
+	t7 := new(big.Int).Sub(s, tt)
+	// t7.Mod(t7, curve.P)
+	// fmt.Printf("t7: %x\n", t7)
+
+	t8 := new(big.Int).Mul(big.NewInt(8), yyyy)
+	t8.Mod(t8, curve.P)
+	// fmt.Printf("t8: %x\n", t8)
+
+	t9 := new(big.Int).Mul(m, t7)
+	t9.Mod(t9, curve.P)
+	// fmt.Printf("t9: %x\n", t9)
+
+	if t9.Cmp(t8) == -1 {
+		t9.Add(t9, curve.P)
 	}
-	r.Lsh(r, 1)
-	v := new(big.Int).Mul(u1, i)
+	y3 := new(big.Int).Sub(t9, t8)
+	// y3.Mod(y3, curve.P)
+	// fmt.Printf("y3: %x\n", y3)
 
-	x3.Set(r)
-	x3.Mul(x3, x3)
-	x3.Sub(x3, j)
-	x3.Sub(x3, v)
-	x3.Sub(x3, v)
-	x3.Mod(x3, curve.P)
-
-	y3.Set(r)
-	v.Sub(v, x3)
-	y3.Mul(y3, v)
-	s1.Mul(s1, j)
-	s1.Lsh(s1, 1)
-	y3.Sub(y3, s1)
-	y3.Mod(y3, curve.P)
-
-	z3.Add(z1, z2)
-	z3.Mul(z3, z3)
-	z3.Sub(z3, z1z1)
-	z3.Sub(z3, z2z2)
-	z3.Mul(z3, h)
+	z3 := new(big.Int).Mul(big.NewInt(2), y1)
+	z3 = new(big.Int).Mul(z3, z1)
 	z3.Mod(z3, curve.P)
 
 	return x3, y3, z3
+
 }
 
 func doubleJacobian2001(curve *elliptic.CurveParams, x, y, z *big.Int) (*big.Int, *big.Int, *big.Int) {
@@ -373,7 +413,7 @@ func doubleJacobian1998(curve *elliptic.CurveParams, x, y, z *big.Int) (*big.Int
 	s := new(big.Int).Mul(big.NewInt(4), t0)
 	s.Mod(s, curve.P)
 	checkSize(s)
-	// fmt.Printf("s:\t%x\n", s)
+	fmt.Printf("s:\t%x\n", s)
 
 	t1 := new(big.Int).Mul(zz, zz)
 	t1.Mod(t1, curve.P)
@@ -398,18 +438,20 @@ func doubleJacobian1998(curve *elliptic.CurveParams, x, y, z *big.Int) (*big.Int
 	t4 := new(big.Int).Mul(m, m)
 	t4.Mod(t4, curve.P)
 	checkSize(t4)
-	fmt.Printf("t4:\t%x\n", t4)
+	// fmt.Printf("t4:\t%x\n", t4)
 
 	t5 := new(big.Int).Mul(big.NewInt(2), s)
 	t5.Mod(t5, curve.P)
 	checkSize(t5)
-	fmt.Printf("t5:\t%x\n", t5)
+	// fmt.Printf("t5:\t%x\n", t5)
 
 	if t4.Cmp(t5) == -1 {
 		t4.Add(t4, curve.P)
 	}
 
 	t := new(big.Int).Sub(t4, t5)
+	fmt.Printf("t:\t%x\n", t)
+
 	// if t.Sign() == -1 {
 	// 	fmt.Println(">>>>>>>>>>..")
 	// 	t.Add(t, curve.P)
@@ -420,11 +462,12 @@ func doubleJacobian1998(curve *elliptic.CurveParams, x, y, z *big.Int) (*big.Int
 
 	x3 := t
 
-	t6 := new(big.Int).Sub(s, t)
-	if t6.Sign() == -1 {
-		t6.Add(t6, curve.P)
+	if s.Cmp(t) == -1 {
+		s.Add(s, curve.P)
 	}
+	t6 := new(big.Int).Sub(s, t)
 	t6.Mod(t6, curve.P)
+	fmt.Printf("t6:\t%x\n", t6)
 	checkSize(t6)
 
 	t7 := new(big.Int).Mul(yy, yy)
@@ -439,18 +482,23 @@ func doubleJacobian1998(curve *elliptic.CurveParams, x, y, z *big.Int) (*big.Int
 	t9 := new(big.Int).Mul(m, t6)
 	t9.Mod(t9, curve.P)
 	checkSize(t9)
-	// fmt.Printf("t9:\t%x\n", t9)
+	fmt.Printf("t9:\t%x\n", t9)
 
 	if t9.Cmp(t8) == -1 {
+		fmt.Println(">>>>>>>>>>>>>>>>>>..")
 		t9.Add(t9, curve.P)
+		fmt.Printf("t9:\t%x\n", t9)
+		checkSize(t9)
 
 	}
-	// fmt.Printf("t9:\t%x\n", t9)
+	fmt.Printf("t9:\t%x\n", t9)
+	checkSize(t9)
 
 	y3 := new(big.Int).Sub(t9, t8)
+	fmt.Printf("y3:\t%x\n", y3)
 	y3.Mod(y3, curve.P)
+	fmt.Printf("y3:\t%x\n", y3)
 	checkSize(y3)
-	// fmt.Printf("y3:\t%x\n", y3)
 
 	// if y3.Sign() == -1 {
 	// 	y3.Add(y3, curve.P)
@@ -470,8 +518,8 @@ func doubleJacobian1998(curve *elliptic.CurveParams, x, y, z *big.Int) (*big.Int
 }
 
 func checkSize(a *big.Int) {
-	length := a.BitLen() / 8
-	if length > 32 {
+	length := a.BitLen()
+	if length > 256 {
 		fmt.Printf("Value:\t%x\n", a)
 	}
 }
@@ -574,74 +622,106 @@ func doubleJacobian2007(curve *elliptic.CurveParams, x, y, z *big.Int) (*big.Int
 	a := big.NewInt(-3)
 	xx := new(big.Int).Mul(x, x)
 	xx.Mod(xx, curve.P)
+	checkSize(xx)
+
 	// fmt.Printf("xx: %x\n", xx)
 
 	yy := new(big.Int).Mul(y, y)
 	yy.Mod(yy, curve.P)
+	checkSize(yy)
+
 	// fmt.Printf("yy: %x\n", yy)
 
 	yyyy := new(big.Int).Mul(yy, yy)
 	yyyy.Mod(yyyy, curve.P)
+	checkSize(yyyy)
+
 	// fmt.Printf("yyyy: %x\n", yyyy)
 
 	t0 := new(big.Int).Add(x, yy)
+	checkSize(t0)
+
 	// fmt.Printf("t0:\t%x\n", t0)
 
 	t1 := new(big.Int).Mul(t0, t0)
 	t1.Mod(t1, curve.P)
+	checkSize(t1)
+
 	// fmt.Printf("t1:\t%x\n", t1)
 
 	t2 := new(big.Int).Sub(t1, xx)
 	if t2.Sign() == -1 {
 		t2.Add(t2, curve.P)
+		checkSize(t2)
+
 	}
 	t2.Mod(t2, curve.P)
+	checkSize(t2)
+
 	// fmt.Printf("t2:\t%x\n", t2)
 
 	t3 := new(big.Int).Sub(t2, yyyy)
 	if t3.Sign() == -1 {
 		t3.Add(t3, curve.P)
+		checkSize(t3)
 	}
 	t3.Mod(t3, curve.P)
+	checkSize(t3)
 
 	s := new(big.Int).Mul(big.NewInt(2), t3)
 	s.Mod(s, curve.P)
+	checkSize(s)
 
 	t4 := new(big.Int).Mul(big.NewInt(3), xx)
 	t4.Mod(t4, curve.P)
+	checkSize(t4)
 
 	m := new(big.Int).Add(t4, a)
 	m.Mod(m, curve.P)
+	checkSize(m)
 
 	t5 := new(big.Int).Mul(m, m)
 	t5.Mod(t5, curve.P)
+	checkSize(t5)
 
 	t6 := new(big.Int).Mul(big.NewInt(2), s)
 	t6.Mod(t6, curve.P)
+	checkSize(t6)
 
 	t := new(big.Int).Sub(t5, t6)
 	if t.Sign() == -1 {
 		t.Add(t, curve.P)
+		checkSize(t)
+
 	}
 	x3 := t
+	checkSize(x3)
 
 	t7 := new(big.Int).Sub(s, t)
 	if t7.Sign() == -1 {
 		t7.Add(t7, curve.P)
+		checkSize(t7)
+
 	}
 	t7.Mod(t7, curve.P)
+	checkSize(t7)
 
 	t8 := new(big.Int).Mul(big.NewInt(8), yyyy)
 	t8.Mod(t8, curve.P)
+	checkSize(t8)
 
 	t9 := new(big.Int).Mul(m, t7)
 	t9.Mod(t9, curve.P)
+	checkSize(t9)
 
 	y3 := new(big.Int).Sub(t9, t8)
 	if y3.Sign() == -1 {
 		y3.Add(y3, curve.P)
+		checkSize(y3)
+
 	}
 	z3 := new(big.Int).Mul(big.NewInt(2), y)
+	checkSize(z3)
 
 	return x3, y3, z3
 
