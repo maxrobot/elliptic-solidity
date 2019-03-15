@@ -1,5 +1,3 @@
-// based upon https://github.com/jbaylina/ecsol however is implementing a different curve
-// secp256r1: This is an implementation of elliptic curve secp256r1 in 100% written in solidity.
 pragma solidity 0.5.5;
 
 import "./ECCMath.sol";
@@ -18,7 +16,25 @@ contract Secp256r1 {
 
     constructor() public {}
 
-   /*
+    function Add(uint p1, uint p2, uint q1, uint q2) 
+        public pure returns(uint, uint)
+    {
+        uint p3;
+        (p1, p2, p3) = _jAdd(p1, p2, uint(1), q1, q2, uint(1));
+
+        return (p1, p2);
+    }
+
+    function Double(uint p1, uint p2) 
+        public pure returns(uint, uint)
+    {
+        uint p3;
+        (p1, p2, p3) = _jDouble(p1, p2, uint(1));
+
+        return (p1, p2);
+    }
+
+    /*
     * _jAdd
     * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
     */
@@ -133,9 +149,7 @@ contract Secp256r1 {
             q2 := sub(t9, mulmod(0x08, yyyy, pd)) // Y3 = t9 - t8 = (M*t7)-(8*YYYY) = (M*(S-T))-(8*YYYY)
             
             q3 := mulmod(0x02, p2, pd) // Z3 = 2*Y1
-
         }
-
     }
 
 }
