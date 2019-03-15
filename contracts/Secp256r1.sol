@@ -41,6 +41,21 @@ contract Secp256r1 {
     function _jAdd(uint p1, uint p2, uint p3, uint q1, uint q2, uint q3)
         public pure returns(uint r1, uint r2, uint r3)    
     {
+        if (p3==0) {
+            r1 = q1;
+            r2 = q2;
+            r3 = q3;
+
+            return (r1, r2, r3);
+
+        } else if (q3==0) {
+            r1 = p1;
+            r2 = p2;
+            r3 = p3;
+
+            return (r1, r2, r3);
+        }
+
         assembly {
             let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
             let z1z1 := mulmod(p3, p3, pd) // Z1Z1 = Z1^2
@@ -101,6 +116,8 @@ contract Secp256r1 {
             }
             r3 := mulmod(sub(mload(0x0260), z1z1), h, pd)
         }
+
+        return (r1, r2, r3);
     }
 
     /*
