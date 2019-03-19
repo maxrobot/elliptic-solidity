@@ -34,21 +34,68 @@ contract Secp256r1 {
         return (p1, p2);
     }
 
+    function test(bytes memory k) 
+        public pure returns(bytes memory)
+    {
+        bytes memory k2 = new bytes(k.length * 8);
+
+        for (uint i = 0; i < k.length; i++) {
+            for (uint bn = 0; bn < 8; bn++) {
+                k2[(i*8) + bn] = k[i];
+                k[i] = k[i] << 1;
+            }
+        }
+
+        return (k2);
+    }
+    /*
+    * ScalarMult
+    * @description performs scalar multiplication of two elliptic curve points, based on golang
+    * crypto/elliptic library
+    */
+    function ScalarMult(uint Bx, uint By, bytes memory k)
+        public pure returns (uint, uint, uint, uint, uint, uint)
+    {
+        uint Bz = 1;
+        uint x = 0;
+        uint y = 0;
+        uint z = 0;
+
+        for (uint i = 0; i < k.length; i++) {
+            (x, y, z) = _jDouble(x, y, z);
+            (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
+            (x, y, z) = _jDouble(x, y, z);
+            (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
+            (x, y, z) = _jDouble(x, y, z);
+            // (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
+            // for (uint bn = 0; bn < 4; bn++) {
+            //     (x, y, z) = _jDouble(x, y, z);
+            //     if ((k[i] & 0x80) == 0x80) {
+            //         (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
+            //     }
+            //     k[i] = k[i] << 1;
+            // }
+        }
+        
+        return (Bx, By, Bz, x, y, z);
+    }
+
     /*
     * _jAdd
-    * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
+    * @description performs double Jacobian as defined below:
+    * https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
     */
     function _jAdd(uint p1, uint p2, uint p3, uint q1, uint q2, uint q3)
         public pure returns(uint r1, uint r2, uint r3)    
     {
-        if (p3==0) {
+        if (p3 == 0) {
             r1 = q1;
             r2 = q2;
             r3 = q3;
 
             return (r1, r2, r3);
 
-        } else if (q3==0) {
+        } else if (q3 == 0) {
             r1 = p1;
             r2 = p2;
             r3 = p3;
@@ -122,51 +169,53 @@ contract Secp256r1 {
 
     /*
     * _jDouble
-    * @description performs double Jacobian as defined - https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/mdbl-2007-bl.op3
+    * @description performs double Jacobian as defined below:
+    * https://hyperelliptic.org/EFD/g1p/auto-code/shortw/jacobian-3/doubling/dbl-2001-b.op3
     */
     function _jDouble(uint p1, uint p2, uint p3)
         public pure returns(uint q1, uint q2, uint q3)    
     {
         assembly {
             let pd := 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF
-            let xx := mulmod(p1, p1, pd) // XX = X1^2
-            let yy := mulmod(p2, p2, pd) // YY = Y1^2
-            let yyyy := mulmod(yy, yy, pd) // YYYY = YY^2
-
-            let t := mulmod(addmod(p1, yy, pd), addmod(p1, yy, pd), pd) // t1 = t0^2 = (X1+YY)^2
-            if lt(mulmod(addmod(p1, yy, pd), addmod(p1, yy, pd), pd), xx) {
-                t := add(mulmod(addmod(p1, yy, pd), addmod(p1, yy, pd), pd), pd) // t1 = ((X1+YY)^2)+pd
-            }
-            t := sub(t, xx) // t2 = t1-XX
+            let delta := mulmod(p3, p3, pd) // delta = Z1^2
+            let gamma := mulmod(p2, p2, pd) // gamma = Y1^2
+            let beta := mulmod(p1, gamma, pd) // beta = X1*gamma
             
-            if lt(t, yyyy) {
-                t := add(t, pd) // t2 = t2+pd
+            let alpha := p1
+            if lt(alpha, delta) {
+                alpha := add(pd, alpha)
             }
-            t := sub(t, yyyy) // t3 = t2-YYYY
+            alpha := mulmod(0x03 , mulmod(sub(alpha, delta), addmod(p1, delta, pd), pd), pd) // alpha = 3*(X1-delta)*(X1+delta)
 
-            let s := mulmod(0x02, t, pd) // S = 2*t3
-            t := mulmod(0x03, xx, pd) // t4 = 3*XX
-            let m := sub(t, 3) // M = t4 + a = t4 + (-3) = t4 - 3
-
-            let tt := sub(mulmod(m, m, pd), mulmod(0x02, s, pd)) // T = t5 - t6 = (M^2) - (2*S)
-            if lt(mulmod(m, m, pd), mulmod(0x02, s, pd)) {
-                tt := sub(add(pd, mulmod(m, m, pd)), mulmod(0x02, s, pd))
+            q1 := mulmod(alpha, alpha, pd)
+            if lt(q1, mulmod(0x08, beta, pd)) {
+                q1 := add(pd, q1)
             }
-            q1 := tt // X3 = T
-
-            if lt(s, tt) {
-                s := add(pd, s)
-            }
-
-            let t9 := mulmod(m, sub(s, tt), pd)
-            if lt(t9, mulmod(0x08, yyyy, pd)) {
-                t9 := add(pd, t9)
-            }
-
-            q2 := sub(t9, mulmod(0x08, yyyy, pd)) // Y3 = t9 - t8 = (M*t7)-(8*YYYY) = (M*(S-T))-(8*YYYY)
+            q1 := sub(q1, mulmod(0x08, beta, pd)) // X3 = (alpha^2)-(8*beta)
             
-            q3 := mulmod(0x02, p2, pd) // Z3 = 2*Y1
+            q3  := addmod(p2, p3, pd)
+            q3 := mulmod(q3, q3, pd)
+            
+            delta := addmod(delta, gamma, pd)
+            if lt(q3, delta) {
+                q3 := add(pd, q3)
+            }
+            q3 := sub(q3, delta) // Z3 = (Y1+Z1)^2-gamma-delta
+
+            q2 := mulmod(0x04, beta, pd)
+            if lt(q2, q1) {
+                q2 := add(pd, q2)
+            }
+            q2 := mulmod(alpha, sub(q2, q1), pd)
+            gamma := mulmod(0x08, mulmod(gamma, gamma, pd), pd)
+            if lt(q2, gamma) {
+                q2 := add(pd, q2)
+            }
+            q2 := sub(q2, gamma) // Y3 = alpha*(4*beta-X3)-8*gamma^2
+
+
         }
+
     }
 
 }
