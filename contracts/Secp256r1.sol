@@ -33,28 +33,14 @@ contract Secp256r1 {
 
         return (p1, p2);
     }
-
-    function test(bytes memory k) 
-        public pure returns(bytes memory)
-    {
-        bytes memory k2 = new bytes(k.length * 8);
-
-        for (uint i = 0; i < k.length; i++) {
-            for (uint bn = 0; bn < 8; bn++) {
-                k2[(i*8) + bn] = k[i];
-                k[i] = k[i] << 1;
-            }
-        }
-
-        return (k2);
-    }
+ 
     /*
     * ScalarMult
     * @description performs scalar multiplication of two elliptic curve points, based on golang
     * crypto/elliptic library
     */
     function ScalarMult(uint Bx, uint By, bytes memory k)
-        public pure returns (uint, uint, uint, uint, uint, uint)
+        public pure returns (uint, uint)
     {
         uint Bz = 1;
         uint x = 0;
@@ -62,24 +48,48 @@ contract Secp256r1 {
         uint z = 0;
 
         for (uint i = 0; i < k.length; i++) {
-            (x, y, z) = _jDouble(x, y, z);
-            (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
-            (x, y, z) = _jDouble(x, y, z);
-            (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
-            (x, y, z) = _jDouble(x, y, z);
-            // (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
-            // for (uint bn = 0; bn < 4; bn++) {
-            //     (x, y, z) = _jDouble(x, y, z);
-            //     if ((k[i] & 0x80) == 0x80) {
-            //         (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
-            //     }
-            //     k[i] = k[i] << 1;
-            // }
+            for (uint bn = 0; bn < 8; bn++) {
+                (x, y, z) = _jDouble(x, y, z);
+                if ((k[i] & 0x80) == 0x80) {
+                    (x, y, z) = _jAdd(Bx, By, Bz, x, y, z);
+                }
+                k[i] = k[i] << 1;
+            }
         }
         
-        return (Bx, By, Bz, x, y, z);
+        return _affineFromJacobian(x, y, z);
     }
 
+    /*
+    * ScalarBaseMult
+    * @description performs scalar multiplication of two elliptic curve points, based on golang
+    * crypto/elliptic library
+    */
+    function ScalarBaseMult(bytes memory k)
+        public pure returns (uint, uint)
+    {
+        return ScalarMult(gx, gy, k);
+    }
+
+
+    /* _affineFromJacobian
+    * @desription returns affine coordinates from a jacobian input follows 
+    * golang elliptic/crypto library
+    */
+    function _affineFromJacobian(uint x, uint y, uint z)
+        public pure returns(uint ax, uint ay)
+    {
+        if (z==0) {
+            return (0, 0);
+        }
+
+        uint zinv = _invmod(z, pp);
+        uint zinvsq = mulmod(zinv, zinv, pp);
+
+        ax = mulmod(x, zinvsq, pp);
+        ay = mulmod(y, mulmod(zinvsq, zinv, pp), pp);
+
+    }
     /*
     * _jAdd
     * @description performs double Jacobian as defined below:
@@ -163,7 +173,6 @@ contract Secp256r1 {
             }
             r3 := mulmod(sub(mload(0x0260), z1z1), h, pd)
         }
-
         return (r1, r2, r3);
     }
 
@@ -212,10 +221,38 @@ contract Secp256r1 {
                 q2 := add(pd, q2)
             }
             q2 := sub(q2, gamma) // Y3 = alpha*(4*beta-X3)-8*gamma^2
+        }
+    }
 
+    /*
+    * invmod
+    * @description returns the inverse of an integer 
+    */
+    function _invmod(uint value, uint p)
+        public pure returns (uint)
+    {
+        assert(value != 0 || value != p || p != 0);
 
+        if (value > p) {
+            value = value % p;
+        }
+        
+        int t1;
+        int t2 = 1;
+        uint r1 = p;
+        uint r2 = value;
+        uint q;
+        
+        while (r2 != 0) {
+            q = r1 / r2;
+            (t1, t2, r1, r2) = (t2, t1 - int(q) * t2, r2, r1 - q * r2);
         }
 
+        if (t1 < 0) {
+            return (p - uint(-t1));
+        }
+
+        return uint(t1);
     }
 
 }
