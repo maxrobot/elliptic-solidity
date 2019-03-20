@@ -1,20 +1,63 @@
 pragma solidity 0.5.5;
 
-import "./ECCMath.sol";
-
 contract Secp256r1 {
 
     uint256 constant gx = 0x6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296;
     uint256 constant gy = 0x4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5;
     uint256 constant pp = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF;
                           
-    uint256 constant n = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
+    uint256 constant nn = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
     uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
     uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
 
     event uint256event(uint256 output);
+    event boolevent(bool output);
 
     constructor() public {}
+
+    /*
+    * Verify
+    * @description verifies that a public key has signed a piece of data
+    */
+    function Verify(uint X, uint Y, bytes memory input, uint r, uint s)
+        public pure returns (bool)
+    {
+        // if (r >= n || s >= n) {
+        //     return false;
+        // }
+
+        uint e = _hashToUint(input);
+        uint w = _invmod(s, nn);
+
+        uint u1 = mulmod(e, w, nn);
+        uint u2 = mulmod(r, w, nn);
+
+        uint x;
+        uint y;
+
+        (x, y) = scalarMultiplications(X, Y, u1, u2);
+        x = mulmod(0x01, x, pp);
+
+        assert(x == r);
+        
+        return true;
+
+    }
+
+    function scalarMultiplications(uint X, uint Y, uint u1, uint u2) 
+        public pure returns(uint, uint)
+    {
+        uint x1;
+        uint y1;
+        uint x2;
+        uint y2;
+
+        (x1, y1) = ScalarBaseMult(toBytes(u1));
+        (x2, y2) = ScalarMult(X, Y, toBytes(u2));
+        // return (x2, y2);
+
+        return Add(x1, y1, x2, y2);
+    }
 
     function Add(uint p1, uint p2, uint q1, uint q2) 
         public pure returns(uint, uint)
@@ -22,7 +65,7 @@ contract Secp256r1 {
         uint p3;
         (p1, p2, p3) = _jAdd(p1, p2, uint(1), q1, q2, uint(1));
 
-        return (p1, p2);
+        return _affineFromJacobian(p1, p2, p3);
     }
 
     function Double(uint p1, uint p2) 
@@ -31,7 +74,7 @@ contract Secp256r1 {
         uint p3;
         (p1, p2, p3) = _jDouble(p1, p2, uint(1));
 
-        return (p1, p2);
+        return _affineFromJacobian(p1, p2, p3);
     }
  
     /*
@@ -222,6 +265,26 @@ contract Secp256r1 {
             }
             q2 := sub(q2, gamma) // Y3 = alpha*(4*beta-X3)-8*gamma^2
         }
+    }
+
+    function _hashToUint(bytes memory input) 
+        public pure returns (uint)
+    {
+        require(input.length >= 32, "slicing out of range");
+        uint x;
+        assembly {
+            x := mload(add(input, 0x20))
+        }
+        return x;
+    }
+
+    function toBytes(uint256 input) internal pure returns (bytes memory out) {
+        out = new bytes(32);
+        assembly {
+            mstore(add(out, 32), input)
+        }
+
+        return out;
     }
 
     /*
