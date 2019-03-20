@@ -10,8 +10,7 @@ contract Secp256r1 {
     uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
     uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
 
-    event uint256event(uint256 output);
-    event boolevent(bool output);
+    event ValidSignature(bytes input, uint r, uint s, bool valid);
 
     constructor() public {}
 
@@ -20,11 +19,11 @@ contract Secp256r1 {
     * @description verifies that a public key has signed a piece of data
     */
     function Verify(uint X, uint Y, bytes memory input, uint r, uint s)
-        public pure returns (bool)
+        public returns (bool)
     {
-        // if (r >= n || s >= n) {
-        //     return false;
-        // }
+        if (r >= nn || s >= nn) {
+            return false;
+        }
 
         uint e = _hashToUint(input);
         uint w = _invmod(s, nn);
@@ -39,6 +38,7 @@ contract Secp256r1 {
         x = mulmod(0x01, x, pp);
 
         assert(x == r);
+        emit ValidSignature(input, r, s, true);
         
         return true;
 

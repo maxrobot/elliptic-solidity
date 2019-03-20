@@ -1,21 +1,15 @@
 "use strict";
 
-const verbose = false;
-
 const assert = require("assert"); // node.js core module
 const BigNumber = require('bignumber.js');
 const EC = require('elliptic').ec;
 const ec = new EC('p256');
 
+require('chai')
+ .use(require('chai-as-promised'))
+ .should();
+
 const Secp256r1 = artifacts.require("Secp256r1");
-const Ecsol = artifacts.require("Ecsol");
-
-const pp = new BigNumber('FFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF', 16);
-const gx = new BigNumber('6B17D1F2E12C4247F8BCE6E563A440F277037D812DEB33A0F4A13945D898C296', 16);
-const gy = new BigNumber('4FE342E2FE1A7F9B8EE7EB4A7C0F9E162BCE33576B315ECECBB6406837BF51F5', 16);
-const n = new BigNumber('FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551', 16);
-
-const n2 = new BigNumber('FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141', 16);
 
 let toBigNumber = function(value) {
     if (!BigNumber.isBigNumber(value)) {
@@ -25,23 +19,16 @@ let toBigNumber = function(value) {
 
 }
 
-function log(S) {
-    if (verbose) {
-        console.log("\t" + S);
-    }
-}
-
-contract.only('Secp256r1.js', (accounts) => {
+contract('Secp256r1.js', (accounts) => {
 
     let secp256r1;
 
     beforeEach('intialise contracts for testing', async function() {
         secp256r1 = await Secp256r1.new();
-        let ecsol = await Ecsol.new();
     })
 
-    describe('Verify Public Key Signature', async () => {
-        it('Verify P256 Signature', async () => {
+    describe('Verify Signed Data', async () => {
+        it('Verify Using Static Data', async () => {
             // Takes public key [pubX+pubY], which has signed data hash producing sig[R+S] and returns true if it actually signed the data
             const pubX = toBigNumber(new BigNumber("a6ad1deeababc22e1eeba4bc93f6535ff95391a1981d9276bbe39b1ce473d6ed", 16));
             const pubY = toBigNumber(new BigNumber("688c2d5b0231d21e9f6ad264cfcdcf09aec15ea8c5c354f38b2fae95e82959e4", 16));
@@ -50,7 +37,62 @@ contract.only('Secp256r1.js', (accounts) => {
             const hash = "0xa591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e";
             
             let res = await secp256r1.Verify(pubX, pubY, hash, R, S);
-            assert.equal(res, true);
+            console.log("\tGas used to verify signature: " + res.receipt.gasUsed.toString());
+            assert.equal(res.logs[0].args['valid'], true);
+        })
+
+        it('Generate P256 Key, Sign Data and Verify', async () => {
+            const msg = 'a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e';
+
+            // Generate keys
+            var key = ec.genKeyPair();
+            var pubPoint = key.getPublic();
+            var pubX = toBigNumber(pubPoint.getX());
+            var pubY = toBigNumber(pubPoint.getY());
+
+
+            // Sign the message's msg (input must be an array, or a hex-string)
+            let signature = key.sign(msg);
+            let R = toBigNumber(signature.r);
+            let S = toBigNumber(signature.s);
+
+            
+            let res = await secp256r1.Verify(pubX, pubY, '0x'+msg, R, S);
+            console.log("\tGas used to verify signature: " + res.receipt.gasUsed.toString());
+            assert.equal(res.logs[0].args['valid'], true);
+        })
+
+        it('Failure: Invalid P256 Public Key', async () => {
+            // change the public slightly to make it invalid
+            const pubX = toBigNumber(new BigNumber("a6ad1deeababc22e1eeba4bc93f6535ff95391a1981d9276bbe39b1ce473d6ed", 16)).slice(0, -2) + "fa";
+            const pubY = toBigNumber(new BigNumber("688c2d5b0231d21e9f6ad264cfcdcf09aec15ea8c5c354f38b2fae95e82959e4", 16));
+            const R = toBigNumber(new BigNumber("912177ddfa310e5daf1a0d53c567b3c19261cda206bf788eaa4a3a708f090856", 16));
+            const S = toBigNumber(new BigNumber("1bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb", 16));
+            const hash = "0xa591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e";
+            
+            await secp256r1.Verify(pubX, pubY, hash, R, S).should.be.rejected;
+        })
+
+        it('Failure: Invalid Signature', async () => {
+            // change the signature slightly to make it invalid
+            const pubX = toBigNumber(new BigNumber("a6ad1deeababc22e1eeba4bc93f6535ff95391a1981d9276bbe39b1ce473d6ed", 16));
+            const pubY = toBigNumber(new BigNumber("688c2d5b0231d21e9f6ad264cfcdcf09aec15ea8c5c354f38b2fae95e82959e4", 16));
+            const R = toBigNumber(new BigNumber("912177ddfa310e5daf1a0d53c567b3c19261cda206bf788eaa4a3a708f090856", 16)).slice(0, -2) + "aa";
+            const S = toBigNumber(new BigNumber("1bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb", 16));
+            const hash = "0xa591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e";
+            
+            await secp256r1.Verify(pubX, pubY, hash, R, S).should.be.rejected;
+        })
+
+        it('Failure: Invalid Data', async () => {
+            // change the signature slightly to make it invalid
+            const pubX = toBigNumber(new BigNumber("a6ad1deeababc22e1eeba4bc93f6535ff95391a1981d9276bbe39b1ce473d6ed", 16));
+            const pubY = toBigNumber(new BigNumber("688c2d5b0231d21e9f6ad264cfcdcf09aec15ea8c5c354f38b2fae95e82959e4", 16));
+            const R = toBigNumber(new BigNumber("912177ddfa310e5daf1a0d53c567b3c19261cda206bf788eaa4a3a708f090856", 16));
+            const S = toBigNumber(new BigNumber("1bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb", 16));
+            const hash = "0xa591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e".slice(0, -2) + "bb";
+            
+            await secp256r1.Verify(pubX, pubY, hash, R, S).should.be.rejected;
         })
     })
 
@@ -83,7 +125,7 @@ contract.only('Secp256r1.js', (accounts) => {
              }
         })
 
-        it.only('Ec Point Doubling', async () => {
+        it('Ec Point Doubling', async () => {
             // Test data generated by golang crypto/elliptic library
             var ECADD_TEST_DATA = require('./data/double-jacobian-affine.json');
 
