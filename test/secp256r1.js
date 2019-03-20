@@ -19,26 +19,7 @@ let toBigNumber = function(value) {
 
 }
 
-function parseBytes(bytes) {
-    return typeof bytes === 'string' ? utils.toArray(bytes, 'hex') :
-                                       bytes;
-}
-
-function Signature(options, enc) {
-    if (options instanceof Signature)
-      return options;
-    
-    assert(options.r && options.s, 'Signature without r or s');
-    this.r = new BigNumber(options.r, 16);
-    this.r = toBigNumber(new BigNumber(options.r, 16));
-    this.s = new BigNumber(options.s, 16);
-    if (options.recoveryParam === undefined)
-      this.recoveryParam = null;
-    else
-      this.recoveryParam = options.recoveryParam;
-  }
-
-contract.only('Secp256r1.js', (accounts) => {
+contract('Secp256r1.js', (accounts) => {
 
     let secp256r1;
 
@@ -46,7 +27,7 @@ contract.only('Secp256r1.js', (accounts) => {
         secp256r1 = await Secp256r1.new();
     })
 
-    describe.only('Verify Signed Data', async () => {
+    describe('Verify Signed Data', async () => {
         it('Verify Using Static Data', async () => {
             // Takes public key [pubX+pubY], which has signed data hash producing sig[R+S] and returns true if it actually signed the data
             const pubX = toBigNumber(new BigNumber("a6ad1deeababc22e1eeba4bc93f6535ff95391a1981d9276bbe39b1ce473d6ed", 16));
@@ -60,45 +41,25 @@ contract.only('Secp256r1.js', (accounts) => {
             assert.equal(res.logs[0].args['valid'], true);
         })
 
-        it.only('Generate P256 Key, Sign Data and Verify', async () => {
-            // Generate keys
-            const priv = toBigNumber(new BigNumber("4d54e11f3fec957432e53f54862935bbc6aebdd2431f7adc8e2121b095d7c24b", 16));
-            const pubX = toBigNumber(new BigNumber("a6ad1deeababc22e1eeba4bc93f6535ff95391a1981d9276bbe39b1ce473d6ed", 16));
-            const pubY = toBigNumber(new BigNumber("688c2d5b0231d21e9f6ad264cfcdcf09aec15ea8c5c354f38b2fae95e82959e4", 16));
-            const R = toBigNumber(new BigNumber("912177ddfa310e5daf1a0d53c567b3c19261cda206bf788eaa4a3a708f090856", 16));
-            const S = toBigNumber(new BigNumber("1bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb", 16));
-            const hash = 'a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e';
-            let signature = '912177ddfa310e5daf1a0d53c567b3c19261cda206bf788eaa4a3a708f0908561bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb';
-            let m = signature.match(/([a-f\d]{64})/gi);
-
-            signature = {
-            r: m[0],
-            s: m[1]
-            };
-
-            // Import public key
-            var pKey = ec.keyFromPrivate('4d54e11f3fec957432e53f54862935bbc6aebdd2431f7adc8e2121b095d7c24b', 'hex');
-
-            // Verify signature
-            console.log(pKey.verify(hash, signature));
+        it('Generate P256 Key, Sign Data and Verify', async () => {
+            const msg = 'a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e';
 
             // Generate keys
             var key = ec.genKeyPair();
             var pubPoint = key.getPublic();
-            var genX = toBigNumber(pubPoint.getX());
-            var genY = toBigNumber(pubPoint.getY());
+            var pubX = toBigNumber(pubPoint.getX());
+            var pubY = toBigNumber(pubPoint.getY());
 
 
-            // Sign the message's hash (input must be an array, or a hex-string)
-            let genSignature = key.sign(hash);
-            console.log(genSignature.r)
-            let genR = toBigNumber(genSignature.r);
-            let genS = toBigNumber(genSignature.s);
+            // Sign the message's msg (input must be an array, or a hex-string)
+            let signature = key.sign(msg);
+            let R = toBigNumber(signature.r);
+            let S = toBigNumber(signature.s);
 
             
-            let res = await secp256r1.Verify(genX, genY, '0x'+hash, genR, genS);
+            let res = await secp256r1.Verify(pubX, pubY, '0x'+msg, R, S);
             console.log("\tGas used to verify signature: " + res.receipt.gasUsed.toString());
-            // assert.equal(res.logs[0].args['valid'], true);
+            assert.equal(res.logs[0].args['valid'], true);
         })
 
         it('Failure: Invalid P256 Public Key', async () => {
