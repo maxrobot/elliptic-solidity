@@ -36,9 +36,8 @@ contract('Secp256r1.js', (accounts) => {
             const S = toBigNumber(new BigNumber("1bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb", 16));
             const hash = "0xa591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e";
             
-            let res = await secp256r1.Verify(pubX, pubY, hash, R, S);
-            console.log("\tGas used to verify signature: " + res.receipt.gasUsed.toString());
-            assert.equal(res.logs[0].args['valid'], true);
+            let res = await secp256r1.Verify(pubX, pubY, R, S, hash);
+            assert.equal(res, true);
         })
 
         it('Generate P256 Key, Sign Data and Verify', async () => {
@@ -58,8 +57,7 @@ contract('Secp256r1.js', (accounts) => {
 
             
             let res = await secp256r1.Verify(pubX, pubY, '0x'+msg, R, S);
-            console.log("\tGas used to verify signature: " + res.receipt.gasUsed.toString());
-            assert.equal(res.logs[0].args['valid'], true);
+            assert.equal(res, true);
         })
 
         it('Failure: Invalid P256 Public Key', async () => {
@@ -70,7 +68,8 @@ contract('Secp256r1.js', (accounts) => {
             const S = toBigNumber(new BigNumber("1bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb", 16));
             const hash = "0xa591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e";
             
-            await secp256r1.Verify(pubX, pubY, hash, R, S).should.be.rejected;
+            let res = await secp256r1.Verify(pubX, pubY, R, S, hash);
+            assert.equal(res, false);
         })
 
         it('Failure: Invalid Signature', async () => {
@@ -81,7 +80,8 @@ contract('Secp256r1.js', (accounts) => {
             const S = toBigNumber(new BigNumber("1bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb", 16));
             const hash = "0xa591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e";
             
-            await secp256r1.Verify(pubX, pubY, hash, R, S).should.be.rejected;
+            let res = await secp256r1.Verify(pubX, pubY, R, S, hash);
+            assert.equal(res, false);
         })
 
         it('Failure: Invalid Data', async () => {
@@ -92,7 +92,8 @@ contract('Secp256r1.js', (accounts) => {
             const S = toBigNumber(new BigNumber("1bd0b92ff302efae4782e16c1b3eeb32b05df7cca4c84d74535bd4fb613e02bb", 16));
             const hash = "0xa591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e".slice(0, -2) + "bb";
             
-            await secp256r1.Verify(pubX, pubY, hash, R, S).should.be.rejected;
+            let res = await secp256r1.Verify(pubX, pubY, R, S, hash);
+            assert.equal(res, false);
         })
     })
 
