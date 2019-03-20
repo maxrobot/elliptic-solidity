@@ -7,8 +7,8 @@ contract Secp256r1 {
     uint256 constant pp = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF;
                           
     uint256 constant nn = 0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551;
-    // uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
-    // uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
+    uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
+    uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
 
     event uint256event(uint256 output);
     event boolevent(bool output);
@@ -20,7 +20,7 @@ contract Secp256r1 {
     * @description verifies that a public key has signed a piece of data
     */
     function Verify(uint X, uint Y, bytes memory input, uint r, uint s)
-        public pure returns (uint, uint, uint)
+        public pure returns (bool)
     {
         // if (r >= n || s >= n) {
         //     return false;
@@ -35,19 +35,16 @@ contract Secp256r1 {
         uint x;
         uint y;
 
-        (x, y) = scalarStuff(X, Y, u1, u2);
-        return (x, y, 1);
-        // x = mulmod(0x01, x, pp);
+        (x, y) = scalarMultiplications(X, Y, u1, u2);
+        x = mulmod(0x01, x, pp);
 
-        // // emit boolevent(x == r);
-        // // assert(x == r);
+        assert(x == r);
         
-        // // return true;
-        // return (x == r);
+        return true;
 
     }
 
-    function scalarStuff(uint X, uint Y, uint u1, uint u2) 
+    function scalarMultiplications(uint X, uint Y, uint u1, uint u2) 
         public pure returns(uint, uint)
     {
         uint x1;
@@ -68,7 +65,7 @@ contract Secp256r1 {
         uint p3;
         (p1, p2, p3) = _jAdd(p1, p2, uint(1), q1, q2, uint(1));
 
-        return (p1, p2);
+        return _affineFromJacobian(p1, p2, p3);
     }
 
     function Double(uint p1, uint p2) 
@@ -77,7 +74,7 @@ contract Secp256r1 {
         uint p3;
         (p1, p2, p3) = _jDouble(p1, p2, uint(1));
 
-        return (p1, p2);
+        return _affineFromJacobian(p1, p2, p3);
     }
  
     /*
