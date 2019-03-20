@@ -10,16 +10,19 @@ contract Secp256r1 {
     uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
     uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
 
-    event ValidSignature(bytes input, uint r, uint s, bool valid);
-
     constructor() public {}
 
     /*
     * Verify
-    * @description verifies that a public key has signed a piece of data
+    * @description - verifies that a public key has signed a given message
+    * @param X - public key coordinate X
+    * @param Y - public key coordinate Y
+    * @param R - signature half R
+    * @param S - signature half S
+    * @param input - hashed message
     */
-    function Verify(uint X, uint Y, bytes memory input, uint r, uint s)
-        public returns (bool)
+    function Verify(uint X, uint Y, uint r, uint s, bytes memory input)
+        public pure returns (bool)
     {
         if (r >= nn || s >= nn) {
             return false;
@@ -37,13 +40,14 @@ contract Secp256r1 {
         (x, y) = scalarMultiplications(X, Y, u1, u2);
         x = mulmod(0x01, x, pp);
 
-        assert(x == r);
-        emit ValidSignature(input, r, s, true);
-        
-        return true;
+        return (x == r);
 
     }
 
+    /*
+    * scalarMultiplications
+    * @description - performs a number of EC operations required in te pk signature verification
+    */
     function scalarMultiplications(uint X, uint Y, uint u1, uint u2) 
         public pure returns(uint, uint)
     {
@@ -54,7 +58,6 @@ contract Secp256r1 {
 
         (x1, y1) = ScalarBaseMult(toBytes(u1));
         (x2, y2) = ScalarMult(X, Y, toBytes(u2));
-        // return (x2, y2);
 
         return Add(x1, y1, x2, y2);
     }
