@@ -10,8 +10,6 @@ contract Secp256r1 {
     uint256 constant a = 0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC;
     uint256 constant b = 0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B;
 
-    event ValidSignature(bytes input, uint r, uint s, bool valid);
-
     constructor() public {}
 
     /*

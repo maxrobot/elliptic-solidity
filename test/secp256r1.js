@@ -55,8 +55,7 @@ contract('Secp256r1.js', (accounts) => {
             let R = toBigNumber(signature.r);
             let S = toBigNumber(signature.s);
 
-            
-            let res = await secp256r1.Verify(pubX, pubY, '0x'+msg, R, S);
+            let res = await secp256r1.Verify(pubX, pubY, R, S, '0x'+msg);
             assert.equal(res, true);
         })
 
