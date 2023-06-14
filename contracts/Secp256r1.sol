@@ -24,7 +24,7 @@ contract Secp256r1 {
     function Verify(uint X, uint Y, uint r, uint s, bytes memory input)
         public pure returns (bool)
     {
-        if (r >= nn || s >= nn) {
+        if (r==0 || s==0 ||r >= nn || s >= nn) {
             return false;
         }
 
